@@ -9,6 +9,15 @@ import { users } from "./lib/users";
 // Global variable to store environment variables
 let globalEnv: Env = {};
 
+// Lazy-initialized server-scoped ID (Cloudflare-safe). Generated on first request/tool call.
+let __SERVER_USER_ID: string | undefined;
+function ensureServerUserId(): string {
+	if (!__SERVER_USER_ID) {
+		__SERVER_USER_ID = crypto.randomUUID();
+	}
+	return __SERVER_USER_ID;
+}
+
 export class MyMCP extends McpAgent {
 	server = new McpServer({
 		name: "Splitwise MCP",
@@ -17,7 +26,9 @@ export class MyMCP extends McpAgent {
 	backendUrl = globalEnv.BACKEND_URL || "http://localhost:3000";
 
 	private splitwiseAuth: SplitwiseAuthService | null = null;
-	userId = crypto.randomUUID();
+	get userId() {
+		return ensureServerUserId();
+	}
 
 	async init() {
 		// Initialize Splitwise auth service using global environment variables

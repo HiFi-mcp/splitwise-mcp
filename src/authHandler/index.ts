@@ -14,6 +14,7 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
  */
 app.get("/authorize/:id", async (cxt: Context) => {
 	try {
+
 		const userId = cxt.req.param("id");
 
 		const splitwiseAuth = new SplitwiseAuthService(
@@ -28,8 +29,6 @@ app.get("/authorize/:id", async (cxt: Context) => {
 			return cxt.json({ error: "Failed to get request token" }, 500);
 		}
 
-		// Store tokens temporarily
-		// const sessionId = crypto.randomUUID();
 		users.set(userId, {
 			id: userId,
 			requestToken: tokens.requestToken,

@@ -10,6 +10,7 @@ import { users } from "./lib/users";
 let globalEnv: Env = {};
 
 // Lazy-initialized server-scoped ID (Cloudflare-safe). Generated on first request/tool call.
+// TODO: not sure that the userId is generated correctly for each user
 let __SERVER_USER_ID: string | undefined;
 function ensureServerUserId(): string {
 	if (!__SERVER_USER_ID) {

@@ -1,7 +1,7 @@
 import { Context, Hono } from "hono";
-import { SplitwiseAuthService } from "../lib/splitwise";
-import { Env } from "../types";
-import { requestTokensState, users } from "../lib/users";
+import { SplitwiseAuthService } from "../splitwise";
+import { Env } from "../../types";
+import { requestTokensState, users } from "../users";
 
 type Variables = {
 	userId: string;
@@ -14,7 +14,6 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
  */
 app.get("/authorize/:id", async (cxt: Context) => {
 	try {
-
 		const userId = cxt.req.param("id");
 
 		const splitwiseAuth = new SplitwiseAuthService(
@@ -29,6 +28,7 @@ app.get("/authorize/:id", async (cxt: Context) => {
 			return cxt.json({ error: "Failed to get request token" }, 500);
 		}
 
+		// Store request token and secret in the users map
 		users.set(userId, {
 			id: userId,
 			requestToken: tokens.requestToken,
@@ -41,6 +41,7 @@ app.get("/authorize/:id", async (cxt: Context) => {
 
 		const authUrl = splitwiseAuth.getAuthorizationURL(tokens.requestToken);
 
+		// redirect user to authorization URL
 		return cxt.redirect(authUrl, 302);
 	} catch (error) {
 		console.error("Error in authorize:", error);
@@ -76,12 +77,14 @@ app.get("/callback", async (cxt: Context) => {
 			return cxt.json({ error: "Invalid or expired session" }, 400);
 		}
 
+		// Initialize SplitwiseAuthService with consumer key and secret
 		const splitwiseAuth = new SplitwiseAuthService(
 			cxt.env.SPLITWISE_CONSUMER_KEY!,
 			cxt.env.SPLITWISE_CONSUMER_SECRET!,
 			cxt.env.SPLITWISE_CALLBACK_URL!
 		);
 
+		// Exchange request token for access token
 		const accessTokens = await splitwiseAuth.getAccessToken(
 			storedTokens.requestToken,
 			storedTokens.requestTokenSecret,
@@ -92,6 +95,7 @@ app.get("/callback", async (cxt: Context) => {
 			return cxt.json({ error: "Failed to get access token" }, 500);
 		}
 
+		// Store access tokens in the user map
 		users.set(userId, {
 			id: userId,
 			access_token: accessTokens.accessToken,
@@ -99,6 +103,9 @@ app.get("/callback", async (cxt: Context) => {
 			requestToken: undefined,
 			requestTokenSecret: undefined,
 		});
+
+		// Clean up request token state
+		requestTokensState.delete(oauth_token);
 
 		return cxt.json({
 			success: true,

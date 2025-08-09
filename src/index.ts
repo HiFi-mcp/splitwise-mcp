@@ -2,7 +2,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { SplitwiseAuthService } from "./lib/splitwise";
-import app from "./authHandler";
+import app from "./lib/authHandler";
 import { Env } from "./types";
 import { users } from "./lib/users";
 
@@ -38,144 +38,8 @@ export class MyMCP extends McpAgent {
 			globalEnv.SPLITWISE_CALLBACK_URL
 		);
 
-		// Authentication tool to start OAuth flow
-		// this.server.tool("splitwise_authenticate", {}, async () => {
-		// 	if (!this.splitwiseAuth) {
-		// 		return {
-		// 			content: [
-		// 				{
-		// 					type: "text",
-		// 					text: "Error: Splitwise not configured. Please set SPLITWISE_CONSUMER_KEY and SPLITWISE_CONSUMER_SECRET environment variables.",
-		// 				},
-		// 			],
-		// 		};
-		// 	}
-
-		// 	try {
-		// 		const tokens = await this.splitwiseAuth.getRequestToken();
-		// 		const authUrl = this.splitwiseAuth.getAuthorizationURL(
-		// 			tokens.requestToken!
-		// 		);
-
-		// 		return {
-		// 			content: [
-		// 				{
-		// 					type: "text",
-		// 					text: `Please visit this URL to authorize Splitwise access: ${authUrl}\n\nAfter authorization, use the splitwise_complete_auth tool with the oauth_verifier code you receive.`,
-		// 				},
-		// 			],
-		// 		};
-		// 	} catch (error) {
-		// 		return {
-		// 			content: [
-		// 				{
-		// 					type: "text",
-		// 					text: `Error starting authentication: ${error}`,
-		// 				},
-		// 			],
-		// 		};
-		// 	}
-		// });
-
-		// // Tool to complete authentication with oauth verifier
-		// this.server.tool(
-		// 	"splitwise_complete_auth",
-		// 	{
-		// 		oauth_verifier: z.string(),
-		// 		session_id: z.string().optional(),
-		// 	},
-		// 	async ({ oauth_verifier, session_id }) => {
-		// 		if (!this.splitwiseAuth) {
-		// 			return {
-		// 				content: [
-		// 					{
-		// 						type: "text",
-		// 						text: "Error: Splitwise not configured",
-		// 					},
-		// 				],
-		// 			};
-		// 		}
-
-		// 		try {
-		// 			// For now, we'll need the user to provide the request token and secret
-		// 			// In a full implementation, these would be stored in the session
-		// 			return {
-		// 				content: [
-		// 					{
-		// 						type: "text",
-		// 						text: `Please use the splitwise_get_access_token tool with your request token, request token secret, and oauth verifier: ${oauth_verifier}`,
-		// 					},
-		// 				],
-		// 			};
-		// 		} catch (error) {
-		// 			return {
-		// 				content: [
-		// 					{
-		// 						type: "text",
-		// 						text: `Error completing authentication: ${error}`,
-		// 					},
-		// 				],
-		// 			};
-		// 		}
-		// 	}
-		// );
-
-		// // Tool to get access token (for manual token exchange)
-		// this.server.tool(
-		// 	"splitwise_get_access_token",
-		// 	{
-		// 		request_token: z.string(),
-		// 		request_token_secret: z.string(),
-		// 		oauth_verifier: z.string(),
-		// 	},
-		// 	async ({ request_token, request_token_secret, oauth_verifier }) => {
-		// 		if (!this.splitwiseAuth) {
-		// 			return {
-		// 				content: [
-		// 					{
-		// 						type: "text",
-		// 						text: "Error: Splitwise not configured",
-		// 					},
-		// 				],
-		// 			};
-		// 		}
-
-		// 		try {
-		// 			const tokens = await this.splitwiseAuth.getAccessToken(
-		// 				request_token,
-		// 				request_token_secret,
-		// 				oauth_verifier
-		// 			);
-
-		// 			// Store the authenticated session
-		// 			const sessionId = crypto.randomUUID();
-		// 			authenticatedSessions.set(sessionId, {
-		// 				access_token: tokens.accessToken!,
-		// 				access_token_secret: tokens.accessTokenSecret!,
-		// 			});
-
-		// 			return {
-		// 				content: [
-		// 					{
-		// 						type: "text",
-		// 						text: `Authentication successful! Your session ID is: ${sessionId}\n\nUse this session ID with other Splitwise tools. Your access tokens have been securely stored.`,
-		// 					},
-		// 				],
-		// 			};
-		// 		} catch (error) {
-		// 			return {
-		// 				content: [
-		// 					{
-		// 						type: "text",
-		// 						text: `Error getting access token: ${error}`,
-		// 					},
-		// 				],
-		// 			};
-		// 		}
-		// 	}
-		// );
-
-		// TODO: All tools need to do proper auth check
+		// TODO: Work on tools auth is completed 
+		// TODO: Go through all tools and implement it with req specifications and fn
 
 		// Splitwise User Tools
 		this.server.tool("splitwise_get_current_user", async () => {
@@ -229,7 +93,6 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_update_user",
 			{
-				session_id: z.string(),
 				user_data: z.object({
 					first_name: z.string().optional(),
 					last_name: z.string().optional(),
@@ -241,7 +104,7 @@ export class MyMCP extends McpAgent {
 					timezone: z.string().optional(),
 				}),
 			},
-			async ({ session_id, user_data }) => {
+			async ({ user_data }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -297,72 +160,65 @@ export class MyMCP extends McpAgent {
 		);
 
 		// Splitwise Group Tools
-		this.server.tool(
-			"splitwise_get_groups",
-			{
-				session_id: z.string(),
-			},
-			async ({ session_id }) => {
-				const userProps = users.get(this.userId);
-				if (
-					!userProps ||
-					!userProps.access_token ||
-					!userProps.accessTokenSecret
-				) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Error: Invalid or expired session. Please authenticate again using splitwise_authenticate.",
-							},
-						],
-					};
-				}
-
-				if (!this.splitwiseAuth) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Error: Splitwise not configured",
-							},
-						],
-					};
-				}
-
-				try {
-					const result = await this.splitwiseAuth.getGroups(
-						userProps.access_token,
-						userProps.accessTokenSecret
-					);
-					return {
-						content: [
-							{
-								type: "text",
-								text: JSON.stringify(result.groups, null, 2),
-							},
-						],
-					};
-				} catch (error) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Error getting groups: ${error}`,
-							},
-						],
-					};
-				}
+		this.server.tool("splitwise_get_groups", {}, async () => {
+			const userProps = users.get(this.userId);
+			if (
+				!userProps ||
+				!userProps.access_token ||
+				!userProps.accessTokenSecret
+			) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: "Error: Invalid or expired session. Please authenticate again using splitwise_authenticate.",
+						},
+					],
+				};
 			}
-		);
+
+			if (!this.splitwiseAuth) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: "Error: Splitwise not configured",
+						},
+					],
+				};
+			}
+
+			try {
+				const result = await this.splitwiseAuth.getGroups(
+					userProps.access_token,
+					userProps.accessTokenSecret
+				);
+				return {
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify(result.groups, null, 2),
+						},
+					],
+				};
+			} catch (error) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Error getting groups: ${error}`,
+						},
+					],
+				};
+			}
+		});
 
 		this.server.tool(
 			"splitwise_get_group",
 			{
-				session_id: z.string(),
 				group_id: z.number(),
 			},
-			async ({ session_id, group_id }) => {
+			async ({ group_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -420,7 +276,6 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_create_group",
 			{
-				session_id: z.string(),
 				group_data: z.object({
 					name: z.string(),
 					group_type: z.string().optional(),
@@ -428,7 +283,7 @@ export class MyMCP extends McpAgent {
 					whiteboard: z.string().optional(),
 				}),
 			},
-			async ({ session_id, group_data }) => {
+			async ({ group_data }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -486,10 +341,9 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_delete_group",
 			{
-				session_id: z.string(),
 				group_id: z.number(),
 			},
-			async ({ session_id, group_id }) => {
+			async ({ group_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -547,10 +401,9 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_undelete_group",
 			{
-				session_id: z.string(),
 				group_id: z.number(),
 			},
-			async ({ session_id, group_id }) => {
+			async ({ group_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -608,13 +461,12 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_add_user_to_group",
 			{
-				session_id: z.string(),
 				group_id: z.number(),
 				user_email: z.string(),
 				first_name: z.string().optional(),
 				last_name: z.string().optional(),
 			},
-			async ({ session_id, group_id, user_email, first_name, last_name }) => {
+			async ({ group_id, user_email, first_name, last_name }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -677,11 +529,10 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_remove_user_from_group",
 			{
-				session_id: z.string(),
 				group_id: z.number(),
 				user_id: z.number(),
 			},
-			async ({ session_id, group_id, user_id }) => {
+			async ({ group_id, user_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -740,72 +591,65 @@ export class MyMCP extends McpAgent {
 		);
 
 		// Splitwise Friend Tools
-		this.server.tool(
-			"splitwise_get_friends",
-			{
-				session_id: z.string(),
-			},
-			async ({ session_id }) => {
-				const userProps = users.get(this.userId);
-				if (
-					!userProps ||
-					!userProps.access_token ||
-					!userProps.accessTokenSecret
-				) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Error: Invalid or expired session. Please authenticate again using splitwise_authenticate.",
-							},
-						],
-					};
-				}
-
-				if (!this.splitwiseAuth) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Error: Splitwise not configured",
-							},
-						],
-					};
-				}
-
-				try {
-					const result = await this.splitwiseAuth.getFriends(
-						userProps.access_token,
-						userProps.accessTokenSecret
-					);
-					return {
-						content: [
-							{
-								type: "text",
-								text: JSON.stringify(result.friends, null, 2),
-							},
-						],
-					};
-				} catch (error) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Error getting friends: ${error}`,
-							},
-						],
-					};
-				}
+		this.server.tool("splitwise_get_friends", {}, async () => {
+			const userProps = users.get(this.userId);
+			if (
+				!userProps ||
+				!userProps.access_token ||
+				!userProps.accessTokenSecret
+			) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: "Error: Invalid or expired session. Please authenticate again using splitwise_authenticate.",
+						},
+					],
+				};
 			}
-		);
+
+			if (!this.splitwiseAuth) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: "Error: Splitwise not configured",
+						},
+					],
+				};
+			}
+
+			try {
+				const result = await this.splitwiseAuth.getFriends(
+					userProps.access_token,
+					userProps.accessTokenSecret
+				);
+				return {
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify(result.friends, null, 2),
+						},
+					],
+				};
+			} catch (error) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Error getting friends: ${error}`,
+						},
+					],
+				};
+			}
+		});
 
 		this.server.tool(
 			"splitwise_get_friend",
 			{
-				session_id: z.string(),
 				friend_id: z.number(),
 			},
-			async ({ session_id, friend_id }) => {
+			async ({ friend_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -864,10 +708,9 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_get_expense",
 			{
-				session_id: z.string(),
 				expense_id: z.number(),
 			},
-			async ({ session_id, expense_id }) => {
+			async ({ expense_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -925,7 +768,6 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_get_expenses",
 			{
-				session_id: z.string(),
 				group_id: z.number().optional(),
 				friend_id: z.number().optional(),
 				dated_after: z.string().optional(),
@@ -935,7 +777,7 @@ export class MyMCP extends McpAgent {
 				limit: z.number().optional(),
 				offset: z.number().optional(),
 			},
-			async ({ session_id, ...params }) => {
+			async ({ ...params }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -993,7 +835,6 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_create_expense",
 			{
-				session_id: z.string(),
 				expense_data: z.object({
 					cost: z.string(),
 					description: z.string(),
@@ -1019,7 +860,7 @@ export class MyMCP extends McpAgent {
 					email_reminder_in_advance: z.number().optional(),
 				}),
 			},
-			async ({ session_id, expense_data }) => {
+			async ({ expense_data }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -1077,7 +918,6 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_update_expense",
 			{
-				session_id: z.string(),
 				expense_id: z.number(),
 				expense_data: z.object({
 					cost: z.string().optional(),
@@ -1104,7 +944,7 @@ export class MyMCP extends McpAgent {
 					email_reminder_in_advance: z.number().optional(),
 				}),
 			},
-			async ({ session_id, expense_id, expense_data }) => {
+			async ({ expense_id, expense_data }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -1163,10 +1003,9 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_delete_expense",
 			{
-				session_id: z.string(),
 				expense_id: z.number(),
 			},
-			async ({ session_id, expense_id }) => {
+			async ({ expense_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -1224,10 +1063,9 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_undelete_expense",
 			{
-				session_id: z.string(),
 				expense_id: z.number(),
 			},
-			async ({ session_id, expense_id }) => {
+			async ({ expense_id }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -1288,11 +1126,10 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"splitwise_get_notifications",
 			{
-				session_id: z.string(),
 				limit: z.number().optional(),
 				offset: z.number().optional(),
 			},
-			async ({ session_id, limit, offset }) => {
+			async ({ limit, offset }) => {
 				const userProps = users.get(this.userId);
 				if (
 					!userProps ||
@@ -1348,38 +1185,32 @@ export class MyMCP extends McpAgent {
 		);
 
 		// Tool to check authentication status
-		this.server.tool(
-			"splitwise_check_auth",
-			{
-				session_id: z.string(),
-			},
-			async ({ session_id }) => {
-				const userProps = users.get(this.userId);
-				if (
-					!userProps ||
-					!userProps.access_token ||
-					!userProps.accessTokenSecret
-				) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Session expired or invalid. Please authenticate again using splitwise_authenticate.",
-							},
-						],
-					};
-				}
-
+		this.server.tool("splitwise_check_auth", {}, async () => {
+			const userProps = users.get(this.userId);
+			if (
+				!userProps ||
+				!userProps.access_token ||
+				!userProps.accessTokenSecret
+			) {
 				return {
 					content: [
 						{
 							type: "text",
-							text: "Authentication valid. You can use other Splitwise tools with this session ID.",
+							text: "Session expired or invalid. Please authenticate again using splitwise_authenticate.",
 						},
 					],
 				};
 			}
-		);
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: "Authentication valid. You can use other Splitwise tools with this session ID.",
+					},
+				],
+			};
+		});
 	}
 }
 

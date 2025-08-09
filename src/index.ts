@@ -183,8 +183,8 @@ export class MyMCP extends McpAgent {
 
 			try {
 				const result = await this.splitwiseAuth.getCurrentUser(
-					user.access_token,
-					user.accessTokenSecret
+					user.access_token!,
+					user.accessTokenSecret!
 				);
 				return {
 					content: [
@@ -222,8 +222,12 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ session_id, user_data }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -248,7 +252,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.updateUser(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						user_data
 					);
 					return {
@@ -279,8 +283,12 @@ export class MyMCP extends McpAgent {
 				session_id: z.string(),
 			},
 			async ({ session_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -305,7 +313,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getGroups(
 						userProps.access_token,
-						userProps.access_token_secret
+						userProps.accessTokenSecret
 					);
 					return {
 						content: [
@@ -335,8 +343,12 @@ export class MyMCP extends McpAgent {
 				group_id: z.number(),
 			},
 			async ({ session_id, group_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -361,7 +373,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getGroup(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						group_id
 					);
 					return {
@@ -397,8 +409,12 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ session_id, group_data }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -423,7 +439,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.createGroup(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						group_data
 					);
 					return {
@@ -454,8 +470,12 @@ export class MyMCP extends McpAgent {
 				group_id: z.number(),
 			},
 			async ({ session_id, group_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -480,7 +500,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.deleteGroup(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						group_id
 					);
 					return {
@@ -511,8 +531,12 @@ export class MyMCP extends McpAgent {
 				group_id: z.number(),
 			},
 			async ({ session_id, group_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -537,7 +561,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.unDeleteGroup(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						group_id
 					);
 					return {
@@ -571,8 +595,12 @@ export class MyMCP extends McpAgent {
 				last_name: z.string().optional(),
 			},
 			async ({ session_id, group_id, user_email, first_name, last_name }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -597,7 +625,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.addUserToGroup(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						group_id,
 						user_email,
 						first_name,
@@ -634,8 +662,12 @@ export class MyMCP extends McpAgent {
 				user_id: z.number(),
 			},
 			async ({ session_id, group_id, user_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -660,7 +692,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.removeUserFromGroup(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						group_id,
 						user_id
 					);
@@ -694,8 +726,12 @@ export class MyMCP extends McpAgent {
 				session_id: z.string(),
 			},
 			async ({ session_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -720,7 +756,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getFriends(
 						userProps.access_token,
-						userProps.access_token_secret
+						userProps.accessTokenSecret
 					);
 					return {
 						content: [
@@ -750,8 +786,12 @@ export class MyMCP extends McpAgent {
 				friend_id: z.number(),
 			},
 			async ({ session_id, friend_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -776,7 +816,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getFriend(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						friend_id
 					);
 					return {
@@ -808,8 +848,12 @@ export class MyMCP extends McpAgent {
 				expense_id: z.number(),
 			},
 			async ({ session_id, expense_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -834,7 +878,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getExpense(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						expense_id
 					);
 					return {
@@ -872,8 +916,12 @@ export class MyMCP extends McpAgent {
 				offset: z.number().optional(),
 			},
 			async ({ session_id, ...params }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -898,7 +946,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getExpenses(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						params
 					);
 					return {
@@ -952,8 +1000,12 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ session_id, expense_data }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -978,7 +1030,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.createExpense(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						expense_data
 					);
 					return {
@@ -1033,8 +1085,12 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ session_id, expense_id, expense_data }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -1059,7 +1115,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.updateExpense(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						expense_id,
 						expense_data
 					);
@@ -1091,8 +1147,12 @@ export class MyMCP extends McpAgent {
 				expense_id: z.number(),
 			},
 			async ({ session_id, expense_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -1117,7 +1177,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.deleteExpense(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						expense_id
 					);
 					return {
@@ -1148,8 +1208,12 @@ export class MyMCP extends McpAgent {
 				expense_id: z.number(),
 			},
 			async ({ session_id, expense_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -1174,7 +1238,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.unDeleteExpense(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						expense_id
 					);
 					return {
@@ -1209,8 +1273,12 @@ export class MyMCP extends McpAgent {
 				offset: z.number().optional(),
 			},
 			async ({ session_id, limit, offset }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{
@@ -1235,7 +1303,7 @@ export class MyMCP extends McpAgent {
 				try {
 					const result = await this.splitwiseAuth.getNotifications(
 						userProps.access_token,
-						userProps.access_token_secret,
+						userProps.accessTokenSecret,
 						{ limit, offset }
 					);
 					return {
@@ -1266,8 +1334,12 @@ export class MyMCP extends McpAgent {
 				session_id: z.string(),
 			},
 			async ({ session_id }) => {
-				const userProps = getAuthenticatedUser(session_id);
-				if (!userProps) {
+				const userProps = users.get(userId);
+				if (
+					!userProps ||
+					!userProps.access_token ||
+					!userProps.accessTokenSecret
+				) {
 					return {
 						content: [
 							{

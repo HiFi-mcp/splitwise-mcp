@@ -84,7 +84,7 @@ app.get("/callback", async (cxt) => {
 		);
 
 		if (!accessTokens.accessToken || !accessTokens.accessTokenSecret) {
-			cxt.json({ error: "Failed to get access token" }, 500);
+			return cxt.json({ error: "Failed to get access token" }, 500);
 		}
 
 		return cxt.json({

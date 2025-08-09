@@ -1,9 +1,13 @@
 import { Context, Hono } from "hono";
 import { SplitwiseAuthService } from "../lib/splitwise";
 import { Env } from "../types";
-import { users } from "../lib/users";
+import { requestTokensState, users } from "../lib/users";
 
-const app = new Hono<{ Bindings: Env }>();
+type Variables = {
+	userId: string;
+};
+
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * Step 1: Get request token and authorization URL
@@ -25,22 +29,20 @@ app.get("/authorize/:id", async (cxt: Context) => {
 		}
 
 		// Store tokens temporarily
-		const sessionId = crypto.randomUUID();
+		// const sessionId = crypto.randomUUID();
 		users.set(userId, {
 			id: userId,
 			requestToken: tokens.requestToken,
 			requestTokenSecret: tokens.requestTokenSecret,
 		});
 
+		requestTokensState.set(tokens.requestToken, {
+			id: userId,
+		});
+
 		const authUrl = splitwiseAuth.getAuthorizationURL(tokens.requestToken);
 
-		return cxt.json({
-			success: true,
-			userId: sessionId,
-			authorization_url: authUrl,
-			request_token: tokens.requestToken,
-			request_token_secret: tokens.requestTokenSecret,
-		});
+		return cxt.redirect(authUrl, 302);
 	} catch (error) {
 		console.error("Error in authorize:", error);
 		return cxt.json({ error: "Failed to get authorization URL" }, 500);
@@ -50,15 +52,19 @@ app.get("/authorize/:id", async (cxt: Context) => {
 /**
  * Step 2: Handle OAuth callback and exchange for access token
  */
-app.get("/callback", async (cxt) => {
+app.get("/callback", async (cxt: Context) => {
 	try {
 		const oauth_token = cxt.req.query("oauth_token");
 		const oauth_verifier = cxt.req.query("oauth_verifier");
-		// TODO: some how need to send userId to callbacks query
-		const userId = cxt.req.query("userId");
 
-		if (!oauth_token || !oauth_verifier || !userId) {
+		if (!oauth_token || !oauth_verifier) {
 			return cxt.json({ error: "Missing required parameters" }, 400);
+		}
+
+		const userId = requestTokensState.get(oauth_token)?.id;
+
+		if (!userId) {
+			return cxt.json({ error: "Invalid or expired session" }, 400);
 		}
 
 		// Retrieve stored tokens
@@ -86,6 +92,14 @@ app.get("/callback", async (cxt) => {
 		if (!accessTokens.accessToken || !accessTokens.accessTokenSecret) {
 			return cxt.json({ error: "Failed to get access token" }, 500);
 		}
+
+		users.set(userId, {
+			id: userId,
+			access_token: accessTokens.accessToken,
+			accessTokenSecret: accessTokens.accessTokenSecret,
+			requestToken: undefined,
+			requestTokenSecret: undefined,
+		});
 
 		return cxt.json({
 			success: true,

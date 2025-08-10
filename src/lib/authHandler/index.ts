@@ -1,7 +1,7 @@
 import { Context, Hono } from "hono";
 import { SplitwiseAuthService } from "../splitwise";
 import { Env } from "../../types";
-import { requestTokensState, users } from "../users";
+import { RedisGlobalStore } from "../users";
 
 type Variables = {
 	userId: string;
@@ -22,6 +22,11 @@ app.get("/authorize/:id", async (cxt: Context) => {
 			cxt.env.SPLITWISE_CALLBACK_URL!
 		);
 
+		const redis = new RedisGlobalStore({
+			url: cxt.env.REDIS_URL!,
+			token: cxt.env.REDIS_TOKEN!,
+		});
+
 		const tokens = await splitwiseAuth.getRequestToken();
 
 		if (!tokens.requestToken || !tokens.requestTokenSecret) {
@@ -29,13 +34,13 @@ app.get("/authorize/:id", async (cxt: Context) => {
 		}
 
 		// Store request token and secret in the users map
-		users.set(userId, {
+		await redis.setUser(userId, {
 			id: userId,
 			requestToken: tokens.requestToken,
 			requestTokenSecret: tokens.requestTokenSecret,
 		});
 
-		requestTokensState.set(tokens.requestToken, {
+		await redis.setRequestToken(tokens.requestToken, {
 			id: userId,
 		});
 
@@ -57,18 +62,25 @@ app.get("/callback", async (cxt: Context) => {
 		const oauth_token = cxt.req.query("oauth_token");
 		const oauth_verifier = cxt.req.query("oauth_verifier");
 
+		const redis = new RedisGlobalStore({
+			url: cxt.env.REDIS_URL!,
+			token: cxt.env.REDIS_TOKEN!,
+		});
+
 		if (!oauth_token || !oauth_verifier) {
 			return cxt.json({ error: "Missing required parameters" }, 400);
 		}
 
-		const userId = requestTokensState.get(oauth_token)?.id;
+		const user = await redis.getRequestToken(oauth_token);
+
+		const userId = user?.id;
 
 		if (!userId) {
 			return cxt.json({ error: "Invalid or expired session" }, 400);
 		}
 
 		// Retrieve stored tokens
-		const storedTokens = users.get(userId);
+		const storedTokens = await redis.getUser(userId);
 		if (
 			!storedTokens ||
 			!storedTokens.requestToken ||
@@ -96,7 +108,7 @@ app.get("/callback", async (cxt: Context) => {
 		}
 
 		// Store access tokens in the user map
-		users.set(userId, {
+		await redis.setUser(userId, {
 			id: userId,
 			access_token: accessTokens.accessToken,
 			accessTokenSecret: accessTokens.accessTokenSecret,
@@ -105,7 +117,6 @@ app.get("/callback", async (cxt: Context) => {
 		});
 
 		// Clean up request token state
-		requestTokensState.delete(oauth_token);
 
 		return cxt.json({
 			success: true,
@@ -121,7 +132,12 @@ app.get("/callback", async (cxt: Context) => {
 app.get("/token/:id", async (ctx: Context) => {
 	const userId = ctx.req.param("id");
 
-	const user = users.get(userId);
+	const redis = new RedisGlobalStore({
+		url: ctx.env.REDIS_URL!,
+		token: ctx.env.REDIS_TOKEN!,
+	});
+
+	const user = await redis.getUser(userId);
 
 	if (!user) {
 		return ctx.json({

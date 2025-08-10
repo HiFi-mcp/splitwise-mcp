@@ -23,6 +23,14 @@ app.get("/authorize/:id", async (cxt: Context) => {
 			cxt.env.SPLITWISE_CALLBACK_URL!
 		);
 
+		console.log("envs: ", {
+			SPLITWISE_CONSUMER_KEY: cxt.env.SPLITWISE_CONSUMER_KEY,
+			SPLITWISE_CONSUMER_SECRET: cxt.env.SPLITWISE_CONSUMER_SECRET,
+			SPLITWISE_CALLBACK_URL: cxt.env.SPLITWISE_CALLBACK_URL,
+			REDIS_URL: cxt.env.REDIS_URL,
+			REDIS_TOKEN: cxt.env.REDIS_TOKEN,
+		})
+
 		const redis = new RedisGlobalStore({
 			url: cxt.env.REDIS_URL!,
 			token: cxt.env.REDIS_TOKEN!,

@@ -3,8 +3,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { SplitwiseAuthService } from "./lib/splitwise";
 import app from "./lib/authHandler";
-import { Env } from "./types";
-import { users } from "./lib/users";
+import { Env, IRequestTokenState, IUsers } from "./types";
+import  { RedisGlobalStore } from "./lib/users";
 
 // Global variable to store environment variables
 let globalEnv: Env = {};
@@ -19,12 +19,67 @@ function ensureServerUserId(): string {
 	return __SERVER_USER_ID;
 }
 
-export class MyMCP extends McpAgent {
-	server = new McpServer({
-		name: "Splitwise MCP",
-		version: "1.0.0",
+export class MyMCP extends McpAgent<Env> {
+	// Initialize server in init() after env is available
+	server!: McpServer;
+	public env: Env;
+
+	globalStore = new RedisGlobalStore({
+		url: this.env.REDIS_URL!,
+		token: this.env.REDIS_TOKEN!,
 	});
-	backendUrl = globalEnv.BACKEND_URL || "http://localhost:3000";
+
+	users = {
+		set: (key: string, user: IUsers) => this.globalStore.setUser(key, user),
+		get: (key: string) => this.globalStore.getUser(key),
+		has: (key: string) => this.globalStore.hasUser(key),
+		delete: (key: string) => this.globalStore.deleteUser(key),
+		clear: () => this.globalStore.clearUsers(),
+		size: () => this.globalStore.getUsersSize(),
+		entries: async () => {
+			const map = await this.globalStore.getAllUsers();
+			return map.entries();
+		},
+		keys: async () => {
+			const map = await this.globalStore.getAllUsers();
+			return Array.from(map.keys());
+		},
+		values: async () => {
+			const map = await this.globalStore.getAllUsers();
+			return Array.from(map.values());
+		},
+	};
+
+	requestTokensState = {
+		set: (key: string, token: IRequestTokenState) =>
+			this.globalStore.setRequestToken(key, token),
+		get: (key: string) => this.globalStore.getRequestToken(key),
+		has: (key: string) => this.globalStore.hasRequestToken(key),
+		delete: (key: string) => this.globalStore.deleteRequestToken(key),
+		clear: () => this.globalStore.clearRequestTokens(),
+		size: () => this.globalStore.getRequestTokensSize(),
+		entries: async () => {
+			const map = await this.globalStore.getAllRequestTokens();
+			return map.entries();
+		},
+		keys: async () => {
+			const map = await this.globalStore.getAllRequestTokens();
+			return Array.from(map.keys());
+		},
+		values: async () => {
+			const map = await this.globalStore.getAllRequestTokens();
+			return Array.from(map.values());
+		},
+	};
+
+	constructor(state: DurableObjectState, env: Env) {
+		super(state, env);
+		this.env = env;
+	}
+	// Compute from current env set in fetch
+	get backendUrl() {
+		return this.env.BACKEND_URL || "";
+	}
 
 	private splitwiseAuth: SplitwiseAuthService | null = null;
 	get userId() {
@@ -32,11 +87,18 @@ export class MyMCP extends McpAgent {
 	}
 
 	async init() {
+		// Create MCP server with runtime env (after fetch set globalEnv)
+		this.server = new McpServer({
+			name: "Splitwise MCP",
+			version: "1.0.0",
+			env: globalEnv,
+		});
+
 		// Initialize Splitwise auth service using global environment variables
 		this.splitwiseAuth = new SplitwiseAuthService(
-			globalEnv.SPLITWISE_CONSUMER_KEY || "",
-			globalEnv.SPLITWISE_CONSUMER_SECRET || "",
-			globalEnv.SPLITWISE_CALLBACK_URL
+			this.env.SPLITWISE_CONSUMER_KEY || "",
+			this.env.SPLITWISE_CONSUMER_SECRET || "",
+			this.env.SPLITWISE_CALLBACK_URL
 		);
 
 		// TODO: Work on tools auth is completed
@@ -44,7 +106,7 @@ export class MyMCP extends McpAgent {
 
 		// Splitwise User Tools
 		this.server.tool("splitwise_get_current_user", async () => {
-			const user = users.get(this.userId);
+			const user = await this.users.get(this.userId);
 			if (!user || !user.access_token || !user.accessTokenSecret) {
 				return {
 					content: [
@@ -106,7 +168,7 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ user_data }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -162,7 +224,7 @@ export class MyMCP extends McpAgent {
 
 		// Splitwise Group Tools
 		this.server.tool("splitwise_get_groups", {}, async () => {
-			const userProps = users.get(this.userId);
+			const userProps = await this.users.get(this.userId);
 			if (
 				!userProps ||
 				!userProps.access_token ||
@@ -220,7 +282,7 @@ export class MyMCP extends McpAgent {
 				group_id: z.number(),
 			},
 			async ({ group_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -285,7 +347,7 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ group_data }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -345,7 +407,7 @@ export class MyMCP extends McpAgent {
 				group_id: z.number(),
 			},
 			async ({ group_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -405,7 +467,7 @@ export class MyMCP extends McpAgent {
 				group_id: z.number(),
 			},
 			async ({ group_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -468,7 +530,7 @@ export class MyMCP extends McpAgent {
 				last_name: z.string().optional(),
 			},
 			async ({ group_id, user_email, first_name, last_name }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -538,7 +600,7 @@ export class MyMCP extends McpAgent {
 				user_id: z.number(),
 			},
 			async ({ group_id, user_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -597,7 +659,7 @@ export class MyMCP extends McpAgent {
 
 		// Splitwise Friend Tools
 		this.server.tool("splitwise_get_friends", {}, async () => {
-			const userProps = users.get(this.userId);
+			const userProps = await this.users.get(this.userId);
 			if (
 				!userProps ||
 				!userProps.access_token ||
@@ -655,7 +717,7 @@ export class MyMCP extends McpAgent {
 				friend_id: z.number(),
 			},
 			async ({ friend_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -716,7 +778,7 @@ export class MyMCP extends McpAgent {
 				expense_id: z.number(),
 			},
 			async ({ expense_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -783,7 +845,7 @@ export class MyMCP extends McpAgent {
 				offset: z.number().optional(),
 			},
 			async ({ ...params }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -866,7 +928,7 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ expense_data }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -950,7 +1012,7 @@ export class MyMCP extends McpAgent {
 				}),
 			},
 			async ({ expense_id, expense_data }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -1011,7 +1073,7 @@ export class MyMCP extends McpAgent {
 				expense_id: z.number(),
 			},
 			async ({ expense_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -1071,7 +1133,7 @@ export class MyMCP extends McpAgent {
 				expense_id: z.number(),
 			},
 			async ({ expense_id }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -1135,7 +1197,7 @@ export class MyMCP extends McpAgent {
 				offset: z.number().optional(),
 			},
 			async ({ limit, offset }) => {
-				const userProps = users.get(this.userId);
+				const userProps = await this.users.get(this.userId);
 				if (
 					!userProps ||
 					!userProps.access_token ||
@@ -1191,7 +1253,7 @@ export class MyMCP extends McpAgent {
 
 		// Tool to check authentication status
 		this.server.tool("splitwise_check_auth", {}, async () => {
-			const userProps = users.get(this.userId);
+			const userProps = await this.users.get(this.userId);
 			if (
 				!userProps ||
 				!userProps.access_token ||

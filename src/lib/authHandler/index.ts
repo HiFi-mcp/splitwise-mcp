@@ -52,9 +52,7 @@ app.get("/authorize/:id", async (cxt: Context) => {
 
 		const authUrl = splitwiseAuth.getAuthorizationURL(tokens.requestToken);
 
-		console.log(authUrl);
-
-		// redirect user to authorization URL
+			// redirect user to authorization URL
 		return cxt.redirect(authUrl, 302);
 	} catch (error) {
 		console.error("Error in authorize:", error);
@@ -87,7 +85,6 @@ app.get("/callback", async (cxt: Context) => {
 
 		const userId = user?.id;
 
-		console.log(userId);
 
 		if (!userId) {
 			return getErrorPageResponse(

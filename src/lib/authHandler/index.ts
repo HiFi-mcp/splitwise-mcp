@@ -2,6 +2,7 @@ import { Context, Hono } from "hono";
 import { SplitwiseAuthService } from "../splitwise";
 import { Env } from "../../types";
 import { RedisGlobalStore } from "../users";
+import { getSuccessPageResponse, getErrorPageResponse } from "../static/templates";
 
 type Variables = {
 	userId: string;
@@ -30,7 +31,7 @@ app.get("/authorize/:id", async (cxt: Context) => {
 		const tokens = await splitwiseAuth.getRequestToken();
 
 		if (!tokens.requestToken || !tokens.requestTokenSecret) {
-			return cxt.json({ error: "Failed to get request token" }, 500);
+			return getErrorPageResponse("Failed to get authorization token. Please try again.");
 		}
 
 		// Store request token and secret in the users map
@@ -50,7 +51,7 @@ app.get("/authorize/:id", async (cxt: Context) => {
 		return cxt.redirect(authUrl, 302);
 	} catch (error) {
 		console.error("Error in authorize:", error);
-		return cxt.json({ error: "Failed to get authorization URL" }, 500);
+		return getErrorPageResponse("Failed to start authorization process. Please try again.");
 	}
 });
 
@@ -68,7 +69,7 @@ app.get("/callback", async (cxt: Context) => {
 		});
 
 		if (!oauth_token || !oauth_verifier) {
-			return cxt.json({ error: "Missing required parameters" }, 400);
+			return getErrorPageResponse("Missing required authorization parameters. Please try the authorization process again.");
 		}
 
 		const user = await redis.getRequestToken(oauth_token);
@@ -76,7 +77,7 @@ app.get("/callback", async (cxt: Context) => {
 		const userId = user?.id;
 
 		if (!userId) {
-			return cxt.json({ error: "Invalid or expired session" }, 400);
+			return getErrorPageResponse("Invalid or expired authorization session. Please try the authorization process again.");
 		}
 
 		// Retrieve stored tokens
@@ -86,7 +87,7 @@ app.get("/callback", async (cxt: Context) => {
 			!storedTokens.requestToken ||
 			!storedTokens.requestTokenSecret
 		) {
-			return cxt.json({ error: "Invalid or expired session" }, 400);
+			return getErrorPageResponse("Invalid or expired authorization session. Please try the authorization process again.");
 		}
 
 		// Initialize SplitwiseAuthService with consumer key and secret
@@ -104,7 +105,7 @@ app.get("/callback", async (cxt: Context) => {
 		);
 
 		if (!accessTokens.accessToken || !accessTokens.accessTokenSecret) {
-			return cxt.json({ error: "Failed to get access token" }, 500);
+			return getErrorPageResponse("Failed to obtain access token. Please try the authorization process again.");
 		}
 
 		// Store access tokens in the user map
@@ -116,16 +117,11 @@ app.get("/callback", async (cxt: Context) => {
 			requestTokenSecret: undefined,
 		});
 
-		// Clean up request token state
-
-		return cxt.json({
-			success: true,
-			access_token: accessTokens.accessToken,
-			access_token_secret: accessTokens.accessTokenSecret,
-		});
+		// Return the success page
+		return getSuccessPageResponse();
 	} catch (error) {
 		console.error("Error in callback:", error);
-		return cxt.json({ error: "Failed to exchange tokens" }, 500);
+		return getErrorPageResponse("An unexpected error occurred during authorization. Please try again.");
 	}
 });
 

@@ -31,9 +31,7 @@ export class SplitwiseAuthService {
 			},
 			signature_method: "HMAC-SHA1",
 			hash_function(base_string, key) {
-				return crypto
-					.HmacSHA1(base_string, key)
-					.toString(crypto.enc.Base64);
+				return crypto.HmacSHA1(base_string, key).toString(crypto.enc.Base64);
 			},
 		});
 	}
@@ -46,33 +44,24 @@ export class SplitwiseAuthService {
 			const requestData = {
 				url: `${this.baseURL}/get_request_token`,
 				method: "POST",
-				data: this.callbackURL
-					? { oauth_callback: this.callbackURL }
-					: {},
+				data: this.callbackURL ? { oauth_callback: this.callbackURL } : {},
 			};
 
-			const authHeader = this.oauth.toHeader(
-				this.oauth.authorize(requestData)
-			);
+			const authHeader = this.oauth.toHeader(this.oauth.authorize(requestData));
 
-			const response = await axios.post(
-				requestData.url,
-				requestData.data,
-				{
-					headers: {
-						...authHeader,
-						"Content-Type": "application/x-www-form-urlencoded",
-					},
-				}
-			);
+			const response = await axios.post(requestData.url, requestData.data, {
+				headers: {
+					...authHeader,
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+			});
 
 			// Parse response (format: oauth_token=...&oauth_token_secret=...&oauth_callback_confirmed=true)
 			const params = new URLSearchParams(response.data);
 
 			return {
 				requestToken: params.get("oauth_token") || undefined,
-				requestTokenSecret:
-					params.get("oauth_token_secret") || undefined,
+				requestTokenSecret: params.get("oauth_token_secret") || undefined,
 			};
 		} catch (error) {
 			console.error("Error getting request token:", error);
@@ -111,24 +100,19 @@ export class SplitwiseAuthService {
 				this.oauth.authorize(requestData, token)
 			);
 
-			const response = await axios.post(
-				requestData.url,
-				requestData.data,
-				{
-					headers: {
-						...authHeader,
-						"Content-Type": "application/x-www-form-urlencoded",
-					},
-				}
-			);
+			const response = await axios.post(requestData.url, requestData.data, {
+				headers: {
+					...authHeader,
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+			});
 
 			// Parse response
 			const params = new URLSearchParams(response.data);
 
 			return {
 				accessToken: params.get("oauth_token") || undefined,
-				accessTokenSecret:
-					params.get("oauth_token_secret") || undefined,
+				accessTokenSecret: params.get("oauth_token_secret") || undefined,
 			};
 		} catch (error) {
 			console.error("Error getting access token:", error);
@@ -147,9 +131,7 @@ export class SplitwiseAuthService {
 		data?: any
 	): Promise<T> {
 		try {
-			const fullURL = url.startsWith("http")
-				? url
-				: `${this.baseURL}${url}`;
+			const fullURL = url.startsWith("http") ? url : `${this.baseURL}${url}`;
 
 			// Convert data to form data format for OAuth signature calculation
 			let formData = {};
@@ -223,10 +205,15 @@ export class SplitwiseAuthService {
 	async updateUser(
 		accessToken: string,
 		accessTokenSecret: string,
-		userData: UpdateUserRequest
+		userData: UpdateUserRequest,
+		userId?: number
 	): Promise<{ user: SplitwiseUser }> {
+		// API requires a user id in the path: /update_user/{id}
+		const id =
+			userId ??
+			(await this.getCurrentUser(accessToken, accessTokenSecret)).user.id;
 		return this.makeAuthenticatedRequest(
-			"/update_user",
+			`/update_user/${id}`,
 			"POST",
 			accessToken,
 			accessTokenSecret,
@@ -325,12 +312,12 @@ export class SplitwiseAuthService {
 		firstName?: string,
 		lastName?: string
 	): Promise<{ success: boolean }> {
-		const data: any = { email: userEmail };
+		const data: any = { group_id: groupId, email: userEmail };
 		if (firstName) data.first_name = firstName;
 		if (lastName) data.last_name = lastName;
 
 		return this.makeAuthenticatedRequest(
-			`/add_user_to_group/${groupId}`,
+			`/add_user_to_group`,
 			"POST",
 			accessToken,
 			accessTokenSecret,
@@ -348,10 +335,11 @@ export class SplitwiseAuthService {
 		userId: number
 	): Promise<{ success: boolean }> {
 		return this.makeAuthenticatedRequest(
-			`/remove_user_from_group/${groupId}/${userId}`,
+			`/remove_user_from_group`,
 			"POST",
 			accessToken,
-			accessTokenSecret
+			accessTokenSecret,
+			{ group_id: groupId, user_id: userId }
 		);
 	}
 

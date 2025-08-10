@@ -39,7 +39,7 @@ export class MyMCP extends McpAgent {
 			globalEnv.SPLITWISE_CALLBACK_URL
 		);
 
-		// TODO: Work on tools auth is completed 
+		// TODO: Work on tools auth is completed
 		// TODO: Go through all tools and implement it with req specifications and fn
 
 		// Splitwise User Tools
@@ -496,13 +496,17 @@ export class MyMCP extends McpAgent {
 				}
 
 				try {
+					const data = {
+						groupId: group_id,
+						userEmail: user_email,
+						firstName: first_name,
+						lastName: last_name,
+					};
+
 					const result = await this.splitwiseAuth.addUserToGroup(
 						userProps.access_token,
 						userProps.accessTokenSecret,
-						group_id,
-						user_email,
-						first_name,
-						last_name
+						data
 					);
 					return {
 						content: [

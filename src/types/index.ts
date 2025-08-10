@@ -12,3 +12,10 @@ export interface IUsers {
 	requestToken?: string;
 	requestTokenSecret?: string;
 }
+
+export interface AddUserToGroupRequest {
+	groupId: number;
+	userEmail: string;
+	firstName?: string;
+	lastName?: string;
+}

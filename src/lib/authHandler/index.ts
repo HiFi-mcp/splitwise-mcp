@@ -2,7 +2,10 @@ import { Context, Hono } from "hono";
 import { SplitwiseAuthService } from "../splitwise";
 import { Env } from "../../types";
 import { RedisGlobalStore } from "../users";
-import { getSuccessPageResponse, getErrorPageResponse } from "../static/templates";
+import {
+	getSuccessPageResponse,
+	getErrorPageResponse,
+} from "../static/templates";
 
 type Variables = {
 	userId: string;
@@ -23,14 +26,6 @@ app.get("/authorize/:id", async (cxt: Context) => {
 			cxt.env.SPLITWISE_CALLBACK_URL!
 		);
 
-		console.log("envs: ", {
-			SPLITWISE_CONSUMER_KEY: cxt.env.SPLITWISE_CONSUMER_KEY,
-			SPLITWISE_CONSUMER_SECRET: cxt.env.SPLITWISE_CONSUMER_SECRET,
-			SPLITWISE_CALLBACK_URL: cxt.env.SPLITWISE_CALLBACK_URL,
-			REDIS_URL: cxt.env.REDIS_URL,
-			REDIS_TOKEN: cxt.env.REDIS_TOKEN,
-		})
-
 		const redis = new RedisGlobalStore({
 			url: cxt.env.REDIS_URL!,
 			token: cxt.env.REDIS_TOKEN!,
@@ -39,7 +34,9 @@ app.get("/authorize/:id", async (cxt: Context) => {
 		const tokens = await splitwiseAuth.getRequestToken();
 
 		if (!tokens.requestToken || !tokens.requestTokenSecret) {
-			return getErrorPageResponse("Failed to get authorization token. Please try again.");
+			return getErrorPageResponse(
+				"Failed to get authorization token. Please try again."
+			);
 		}
 
 		// Store request token and secret in the users map
@@ -55,11 +52,15 @@ app.get("/authorize/:id", async (cxt: Context) => {
 
 		const authUrl = splitwiseAuth.getAuthorizationURL(tokens.requestToken);
 
+		console.log(authUrl);
+
 		// redirect user to authorization URL
 		return cxt.redirect(authUrl, 302);
 	} catch (error) {
 		console.error("Error in authorize:", error);
-		return getErrorPageResponse("Failed to start authorization process. Please try again.");
+		return getErrorPageResponse(
+			"Failed to start authorization process. Please try again."
+		);
 	}
 });
 
@@ -77,15 +78,21 @@ app.get("/callback", async (cxt: Context) => {
 		});
 
 		if (!oauth_token || !oauth_verifier) {
-			return getErrorPageResponse("Missing required authorization parameters. Please try the authorization process again.");
+			return getErrorPageResponse(
+				"Missing required authorization parameters. Please try the authorization process again."
+			);
 		}
 
 		const user = await redis.getRequestToken(oauth_token);
 
 		const userId = user?.id;
 
+		console.log(userId);
+
 		if (!userId) {
-			return getErrorPageResponse("Invalid or expired authorization session. Please try the authorization process again.");
+			return getErrorPageResponse(
+				"Invalid or expired authorization session. Please try the authorization process again."
+			);
 		}
 
 		// Retrieve stored tokens
@@ -95,7 +102,9 @@ app.get("/callback", async (cxt: Context) => {
 			!storedTokens.requestToken ||
 			!storedTokens.requestTokenSecret
 		) {
-			return getErrorPageResponse("Invalid or expired authorization session. Please try the authorization process again.");
+			return getErrorPageResponse(
+				"Invalid or expired authorization session. Please try the authorization process again."
+			);
 		}
 
 		// Initialize SplitwiseAuthService with consumer key and secret
@@ -113,23 +122,30 @@ app.get("/callback", async (cxt: Context) => {
 		);
 
 		if (!accessTokens.accessToken || !accessTokens.accessTokenSecret) {
-			return getErrorPageResponse("Failed to obtain access token. Please try the authorization process again.");
+			return getErrorPageResponse(
+				"Failed to obtain access token. Please try the authorization process again."
+			);
 		}
 
-		// Store access tokens in the user map
-		await redis.setUser(userId, {
-			id: userId,
+		// Store access tokens in the user map and remove request tokens
+		await redis.updateUser(userId, {
 			access_token: accessTokens.accessToken,
 			accessTokenSecret: accessTokens.accessTokenSecret,
-			requestToken: undefined,
-			requestTokenSecret: undefined,
 		});
+
+		// Remove request tokens from user record
+		await redis.removeUserFields(userId, [
+			"requestToken",
+			"requestTokenSecret",
+		]);
 
 		// Return the success page
 		return getSuccessPageResponse();
 	} catch (error) {
 		console.error("Error in callback:", error);
-		return getErrorPageResponse("An unexpected error occurred during authorization. Please try again.");
+		return getErrorPageResponse(
+			"An unexpected error occurred during authorization. Please try again."
+		);
 	}
 });
 

@@ -17,10 +17,20 @@ export class RedisGlobalStore {
 	async setUser(key: string, user: IUsers): Promise<void> {
 		try {
 			const redisKey = `${this.USERS_PREFIX}${key}`;
-			await this.redis.hset(
-				redisKey,
-				user as unknown as Record<string, unknown>
-			);
+
+			// Filter out undefined and null values to avoid Redis errors
+			const filteredUser: Record<string, unknown> = {};
+			Object.entries(user).forEach(([k, v]) => {
+				if (v !== undefined && v !== null) {
+					filteredUser[k] = v;
+				}
+			});
+
+			if (Object.keys(filteredUser).length === 0) {
+				throw new Error("No valid data to store");
+			}
+
+			await this.redis.hset(redisKey, filteredUser);
 
 			// Optional: Set expiration (e.g., 24 hours)
 			// await this.redis.expire(redisKey, 24 * 60 * 60);
@@ -134,10 +144,20 @@ export class RedisGlobalStore {
 	): Promise<void> {
 		try {
 			const redisKey = `${this.REQUEST_TOKENS_PREFIX}${key}`;
-			await this.redis.hset(
-				redisKey,
-				tokenState as unknown as Record<string, unknown>
-			);
+
+			// Filter out undefined and null values to avoid Redis errors
+			const filteredTokenState: Record<string, unknown> = {};
+			Object.entries(tokenState).forEach(([k, v]) => {
+				if (v !== undefined && v !== null) {
+					filteredTokenState[k] = v;
+				}
+			});
+
+			if (Object.keys(filteredTokenState).length === 0) {
+				throw new Error("No valid token data to store");
+			}
+
+			await this.redis.hset(redisKey, filteredTokenState);
 
 			// Set expiration for request tokens (e.g., 15 minutes)
 			await this.redis.expire(redisKey, 15 * 60);
@@ -236,12 +256,39 @@ export class RedisGlobalStore {
 	async updateUser(key: string, updates: Partial<IUsers>): Promise<void> {
 		try {
 			const redisKey = `${this.USERS_PREFIX}${key}`;
-			await this.redis.hset(
-				redisKey,
-				updates as unknown as Record<string, unknown>
-			);
+
+			// Filter out undefined and null values to avoid Redis errors
+			const filteredUpdates: Record<string, unknown> = {};
+			Object.entries(updates).forEach(([k, v]) => {
+				if (v !== undefined && v !== null) {
+					filteredUpdates[k] = v;
+				}
+			});
+
+			if (Object.keys(filteredUpdates).length === 0) {
+				console.warn("No valid updates to apply");
+				return;
+			}
+
+			await this.redis.hset(redisKey, filteredUpdates);
 		} catch (error) {
 			console.error("Error updating user:", error);
+			throw error;
+		}
+	}
+
+	// Remove specific fields from user record
+	async removeUserFields(key: string, fields: string[]): Promise<void> {
+		try {
+			const redisKey = `${this.USERS_PREFIX}${key}`;
+
+			if (fields.length === 0) {
+				return;
+			}
+
+			await this.redis.hdel(redisKey, ...fields);
+		} catch (error) {
+			console.error("Error removing user fields:", error);
 			throw error;
 		}
 	}
@@ -253,7 +300,18 @@ export class RedisGlobalStore {
 
 			users.forEach((user, key) => {
 				const redisKey = `${this.USERS_PREFIX}${key}`;
-				pipeline.hset(redisKey, user as unknown as Record<string, unknown>);
+
+				// Filter out undefined and null values to avoid Redis errors
+				const filteredUser: Record<string, unknown> = {};
+				Object.entries(user).forEach(([k, v]) => {
+					if (v !== undefined && v !== null) {
+						filteredUser[k] = v;
+					}
+				});
+
+				if (Object.keys(filteredUser).length > 0) {
+					pipeline.hset(redisKey, filteredUser);
+				}
 			});
 
 			await pipeline.exec();
@@ -271,8 +329,19 @@ export class RedisGlobalStore {
 
 			tokens.forEach((token, key) => {
 				const redisKey = `${this.REQUEST_TOKENS_PREFIX}${key}`;
-				pipeline.hset(redisKey, token as unknown as Record<string, unknown>);
-				pipeline.expire(redisKey, 15 * 60); // 15 minutes expiration
+
+				// Filter out undefined and null values to avoid Redis errors
+				const filteredToken: Record<string, unknown> = {};
+				Object.entries(token).forEach(([k, v]) => {
+					if (v !== undefined && v !== null) {
+						filteredToken[k] = v;
+					}
+				});
+
+				if (Object.keys(filteredToken).length > 0) {
+					pipeline.hset(redisKey, filteredToken);
+					pipeline.expire(redisKey, 15 * 60); // 15 minutes expiration
+				}
 			});
 
 			await pipeline.exec();

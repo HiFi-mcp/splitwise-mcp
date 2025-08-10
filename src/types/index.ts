@@ -5,6 +5,7 @@ export interface Env {
 	BACKEND_URL?: string;
 	REDIS_URL?: string;
 	REDIS_TOKEN?: string;
+	PHONE_NUMBER?: string;
 }
 export interface IUsers {
 	id: string;

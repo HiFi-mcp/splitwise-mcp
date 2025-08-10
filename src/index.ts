@@ -104,6 +104,20 @@ export class MyMCP extends McpAgent<Env> {
 		// TODO: Work on tools auth is completed
 		// TODO: Go through all tools and implement it with req specifications and fn
 
+		this.server.tool(
+			"validate",
+			"Validated this mcp server to be used by PuchAI",
+			{},
+			async () => {
+				// Format phone number to {country_code}{number} format (remove + prefix)
+				const phoneNumber = this.env.PHONE_NUMBER || "";
+				const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
+
+				return {
+					content: [{ text: formattedPhoneNumber, type: "text" }],
+				};
+			}
+		);
 		// Splitwise User Tools
 		this.server.tool(
 			"splitwise_get_current_user",

@@ -3,8 +3,9 @@ export interface Env {
 	SPLITWISE_CONSUMER_SECRET?: string;
 	SPLITWISE_CALLBACK_URL?: string;
 	BACKEND_URL?: string;
+	REDIS_URL?: string;
+	REDIS_TOKEN?: string;
 }
-
 export interface IUsers {
 	id: string;
 	access_token?: string;
@@ -18,4 +19,8 @@ export interface AddUserToGroupRequest {
 	userEmail: string;
 	firstName?: string;
 	lastName?: string;
+}
+
+export interface IRequestTokenState {
+	id: string;
 }

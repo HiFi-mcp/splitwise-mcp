@@ -13,6 +13,7 @@ import {
 	UpdateExpenseRequest,
 	UpdateUserRequest,
 } from "../response/splitwise";
+import { AddUserToGroupRequest } from "../../types";
 
 export class SplitwiseAuthService {
 	private oauth: OAuth;
@@ -307,14 +308,11 @@ export class SplitwiseAuthService {
 	async addUserToGroup(
 		accessToken: string,
 		accessTokenSecret: string,
-		groupId: number,
-		userEmail: string,
-		firstName?: string,
-		lastName?: string
+		userData: AddUserToGroupRequest
 	): Promise<{ success: boolean }> {
-		const data: any = { group_id: groupId, email: userEmail };
-		if (firstName) data.first_name = firstName;
-		if (lastName) data.last_name = lastName;
+		const data: AddUserToGroupRequest = { groupId: userData.groupId, userEmail: userData.userEmail };
+		if (userData.firstName) data.firstName = userData.firstName;
+		if (userData.lastName) data.lastName = userData.lastName;
 
 		return this.makeAuthenticatedRequest(
 			`/add_user_to_group`,

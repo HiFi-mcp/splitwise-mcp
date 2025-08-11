@@ -9,12 +9,19 @@ import { RedisGlobalStore } from "./lib/users";
 // Global variable to store environment variables
 let globalEnv: Env = {};
 
-// Lazy-initialized server-scoped ID (Cloudflare-safe). Generated on first request/tool call.
-// TODO: not sure that the userId is generated correctly for each user
+// Use Durable Object state to persist user ID across requests
 let __SERVER_USER_ID: string | undefined;
-function ensureServerUserId(): string {
+async function ensureServerUserId(state: DurableObjectState): Promise<string> {
 	if (!__SERVER_USER_ID) {
-		__SERVER_USER_ID = crypto.randomUUID();
+		// Try to get existing user ID from state
+		const storedUserId = await state.storage.get<string>("userId");
+		if (storedUserId) {
+			__SERVER_USER_ID = storedUserId;
+		} else {
+			// Generate new user ID and store it
+			__SERVER_USER_ID = crypto.randomUUID();
+			await state.storage.put("userId", __SERVER_USER_ID);
+		}
 	}
 	return __SERVER_USER_ID;
 }
@@ -23,6 +30,7 @@ export class MyMCP extends McpAgent<Env> {
 	// Initialize server in init() after env is available
 	server!: McpServer;
 	public env: Env;
+	private durableState: DurableObjectState;
 
 	globalStore = new RedisGlobalStore({
 		url: this.env.REDIS_URL!,
@@ -75,6 +83,7 @@ export class MyMCP extends McpAgent<Env> {
 	constructor(state: DurableObjectState, env: Env) {
 		super(state, env);
 		this.env = env;
+		this.durableState = state;
 	}
 	// Compute from current env set in fetch
 	get backendUrl() {
@@ -82,8 +91,9 @@ export class MyMCP extends McpAgent<Env> {
 	}
 
 	private splitwiseAuth: SplitwiseAuthService | null = null;
-	get userId() {
-		return ensureServerUserId();
+
+	async getUserId(): Promise<string> {
+		return await ensureServerUserId(this.durableState);
 	}
 
 	async init() {
@@ -123,13 +133,14 @@ export class MyMCP extends McpAgent<Env> {
 			"splitwise_get_current_user",
 			"Retrieve comprehensive profile information for the currently authenticated user from Splitwise, including personal details, preferences, and account settings. This tool requires a valid authentication session.",
 			async () => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId();
+				const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -187,13 +198,14 @@ export class MyMCP extends McpAgent<Env> {
 				}),
 			},
 			async ({ user_data }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId();
+				const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -242,13 +254,13 @@ export class MyMCP extends McpAgent<Env> {
 			"splitwise_get_groups",
 			"Retrieve a complete list of all groups that the currently authenticated user belongs to in Splitwise. Returns detailed information about each group including members, balances, and group settings. Useful for overviewing all shared expense groups.",
 			async () => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -298,13 +310,13 @@ export class MyMCP extends McpAgent<Env> {
 				group_id: z.number(),
 			},
 			async ({ group_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -360,13 +372,13 @@ export class MyMCP extends McpAgent<Env> {
 				}),
 			},
 			async ({ group_data }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -417,13 +429,13 @@ export class MyMCP extends McpAgent<Env> {
 				group_id: z.number(),
 			},
 			async ({ group_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -474,13 +486,13 @@ export class MyMCP extends McpAgent<Env> {
 				group_id: z.number(),
 			},
 			async ({ group_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -534,13 +546,13 @@ export class MyMCP extends McpAgent<Env> {
 				last_name: z.string().optional(),
 			},
 			async ({ group_id, user_email, first_name, last_name }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -601,13 +613,13 @@ export class MyMCP extends McpAgent<Env> {
 				user_id: z.number(),
 			},
 			async ({ group_id, user_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -659,13 +671,13 @@ export class MyMCP extends McpAgent<Env> {
 			"splitwise_get_friends",
 			"Retrieve a complete list of all friends connected to the current user's Splitwise account. Returns friend profiles including their names, email addresses, and any shared expense history. Useful for managing personal expense relationships outside of groups.",
 			async () => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -715,13 +727,13 @@ export class MyMCP extends McpAgent<Env> {
 				friend_id: z.number(),
 			},
 			async ({ friend_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -773,13 +785,13 @@ export class MyMCP extends McpAgent<Env> {
 				expense_id: z.number(),
 			},
 			async ({ expense_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -837,13 +849,13 @@ export class MyMCP extends McpAgent<Env> {
 				offset: z.number().optional(),
 			},
 			async ({ ...params }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -917,13 +929,13 @@ export class MyMCP extends McpAgent<Env> {
 				}),
 			},
 			async ({ expense_data }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -998,13 +1010,13 @@ export class MyMCP extends McpAgent<Env> {
 				}),
 			},
 			async ({ expense_id, expense_data }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -1056,13 +1068,13 @@ export class MyMCP extends McpAgent<Env> {
 				expense_id: z.number(),
 			},
 			async ({ expense_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -1113,13 +1125,13 @@ export class MyMCP extends McpAgent<Env> {
 				expense_id: z.number(),
 			},
 			async ({ expense_id }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -1174,13 +1186,13 @@ export class MyMCP extends McpAgent<Env> {
 				offset: z.number().optional(),
 			},
 			async ({ limit, offset }) => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -1229,13 +1241,13 @@ export class MyMCP extends McpAgent<Env> {
 			"splitwise_check_auth",
 			"Verify the current user's authentication status and session validity for Splitwise API operations. Returns whether the session is active and ready for making authenticated requests. Use this to check if re-authentication is required before calling other tools.",
 			async () => {
-				const user = await this.users.get(this.userId);
+				const userId = await this.getUserId(); const user = await this.users.get(userId);
 				if (!user || !user.access_token || !user.accessTokenSecret) {
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${this.userId}`,
+								text: `Error: Invalid or expired session. Please visit ${this.backendUrl}/authorize/${userId}`,
 							},
 						],
 					};
@@ -1245,7 +1257,7 @@ export class MyMCP extends McpAgent<Env> {
 					content: [
 						{
 							type: "text",
-							text: "Authentication valid. You can use other Splitwise tools with this session ID.",
+							text: `Authentication valid. Session ID: ${userId}. You can use other Splitwise tools with this session.`,
 						},
 					],
 				};

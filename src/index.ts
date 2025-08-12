@@ -111,6 +111,33 @@ export class MyMCP extends McpAgent<Env> {
 			this.env.SPLITWISE_CALLBACK_URL
 		);
 
+		const about = {
+			"name": "Splitwise MCP",
+			"version": "1.0.0",
+			"description": "This MCP server can be used to manage your Splitwise account and expenses",
+			"author": "HiFi-mcp",
+			"license": "MIT",
+			"homepage": "https://github.com/HiFi-mcp/splitwise-mcp",
+			"contact": {
+				"email": "hello@hifi.click",
+				"url": "https://web.hifi.click"
+			},
+			"repository": {
+				"type": "git",
+				"url": "https://github.com/HiFi-mcp/splitwise-mcp"
+			}
+		};
+
+		this.server.tool(
+			'about',
+			'About this MCP server',
+			async () => {
+				return {
+					content: [{ text: JSON.stringify(about, null, 2), type: "text" }],
+				};
+			}
+		)
+
 		// TODO: Work on tools auth is completed
 		// TODO: Go through all tools and implement it with req specifications and fn
 

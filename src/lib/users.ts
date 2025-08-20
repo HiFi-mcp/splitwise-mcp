@@ -52,7 +52,6 @@ export class RedisGlobalStore {
 			return {
 				id: (userData.id as string) || "",
 				access_token: userData.access_token as string | undefined,
-				accessTokenSecret: userData.accessTokenSecret as string | undefined,
 				requestToken: userData.requestToken as string | undefined,
 				requestTokenSecret: userData.requestTokenSecret as string | undefined,
 			} as IUsers;
@@ -97,7 +96,6 @@ export class RedisGlobalStore {
 					usersMap.set(originalKey, {
 						id: (userData.id as string) || "",
 						access_token: userData.access_token as string | undefined,
-						accessTokenSecret: userData.accessTokenSecret as string | undefined,
 						requestToken: userData.requestToken as string | undefined,
 						requestTokenSecret: userData.requestTokenSecret as
 							| string

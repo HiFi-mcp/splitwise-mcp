@@ -1,59 +1,85 @@
 import { Context, Hono } from "hono";
 import { SplitwiseAuthService } from "../splitwise";
-import { Env } from "../../types";
+import { Env, Props } from "../../types";
 import { RedisGlobalStore } from "../users";
 import {
-	getSuccessPageResponse,
 	getErrorPageResponse,
 } from "../static/templates";
+import {
+	clientIdAlreadyApproved,
+	parseRedirectApproval,
+	renderApprovalDialog,
+} from "../utils/oauth-worker";
+import { AuthRequest } from "@cloudflare/workers-oauth-provider";
+import { getUpstreamAuthorizeUrl } from "../utils/base.utils";
 
 type Variables = {
 	userId: string;
 };
+
+function RedirectToSplitwise(
+	ctx: Context,
+	oauthReqInfo: AuthRequest,
+	headers: Record<string, string> = {},
+	upstreamUrl: string
+) {
+	return new Response(null, {
+		headers: {
+			...headers,
+			location: getUpstreamAuthorizeUrl({
+				clientId: ctx.env.SPLITWISE_CONSUMER_KEY!,
+				redirectUri: new URL("/callback", ctx.req.raw.url).href,
+				scope: "read write",
+				state: btoa(JSON.stringify(oauthReqInfo)),
+				upstreamUrl: upstreamUrl,
+			}),
+		},
+		status: 302,
+	});
+}
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * Step 1: Get request token and authorization URL
  */
-app.get("/authorize/:id", async (cxt: Context) => {
+app.get("/authorize", async (ctx: Context) => {
 	try {
-		const userId = cxt.req.param("id");
 
-		const splitwiseAuth = new SplitwiseAuthService(
-			cxt.env.SPLITWISE_CONSUMER_KEY!,
-			cxt.env.SPLITWISE_CONSUMER_SECRET!,
-			cxt.env.SPLITWISE_CALLBACK_URL!
+		const oauthReqInfo = await ctx.env.OAUTH_PROVIDER.parseAuthRequest(
+			ctx.req.raw
 		);
 
-		const redis = new RedisGlobalStore({
-			url: cxt.env.REDIS_URL!,
-			token: cxt.env.REDIS_TOKEN!,
-		});
-
-		const tokens = await splitwiseAuth.getRequestToken();
-
-		if (!tokens.requestToken || !tokens.requestTokenSecret) {
-			return getErrorPageResponse(
-				"Failed to get authorization token. Please try again."
-			);
+		const { clientId } = oauthReqInfo;
+		if (!clientId) {
+			return ctx.text("Invalid request", 400);
 		}
 
-		// Store request token and secret in the users map
-		await redis.setUser(userId, {
-			id: userId,
-			requestToken: tokens.requestToken,
-			requestTokenSecret: tokens.requestTokenSecret,
+		if (
+			await clientIdAlreadyApproved(
+				ctx.req.raw,
+				oauthReqInfo.clientId,
+				ctx.env.COOKIE_ENCRYPTION_KEY
+			)
+		) {
+			const splitwiseAuth = new SplitwiseAuthService(
+				ctx.env.SPLITWISE_CONSUMER_KEY!,
+				ctx.env.SPLITWISE_CONSUMER_SECRET!,
+				ctx.env.SPLITWISE_CALLBACK_URL!
+			);
+
+			const authUrl = splitwiseAuth.getAuthorizationURL();
+			return RedirectToSplitwise(ctx, oauthReqInfo, {}, authUrl);
+		}
+
+		return renderApprovalDialog(ctx.req.raw, {
+			client: await ctx.env.OAUTH_PROVIDER.lookupClient(clientId),
+			server: {
+				description: "This MCP Server provides Splitwise OAuth integration.",
+				name: "Splitwise OAuth",
+			},
+			state: { oauthReqInfo },
 		});
-
-		await redis.setRequestToken(tokens.requestToken, {
-			id: userId,
-		});
-
-		const authUrl = splitwiseAuth.getAuthorizationURL(tokens.requestToken);
-
-			// redirect user to authorization URL
-		return cxt.redirect(authUrl, 302);
 	} catch (error) {
 		console.error("Error in authorize:", error);
 		return getErrorPageResponse(
@@ -62,82 +88,111 @@ app.get("/authorize/:id", async (cxt: Context) => {
 	}
 });
 
+app.post("/authorize", async (ctx) => {
+	const { state } = await parseRedirectApproval(
+		ctx.req.raw,
+		ctx.env.COOKIE_ENCRYPTION_KEY
+	);
+	if (!state.oauthReqInfo) {
+		return ctx.text("Invalid request", 400);
+	}
+
+	const splitwiseAuth = new SplitwiseAuthService(
+		ctx.env.SPLITWISE_CONSUMER_KEY!,
+		ctx.env.SPLITWISE_CONSUMER_SECRET!,
+		ctx.env.SPLITWISE_CALLBACK_URL!
+	);
+
+	const authUrl = splitwiseAuth.getAuthorizationURL();
+
+	return RedirectToSplitwise(ctx, state.oauthReqInfo, {}, authUrl);
+});
+
 /**
  * Step 2: Handle OAuth callback and exchange for access token
  */
-app.get("/callback", async (cxt: Context) => {
+app.get("/callback", async (ctx: Context) => {
 	try {
-		const oauth_token = cxt.req.query("oauth_token");
-		const oauth_verifier = cxt.req.query("oauth_verifier");
+		const oauthReqInfo = JSON.parse(
+			atob(ctx.req.query("state") as string)
+		) as AuthRequest;
 
-		const redis = new RedisGlobalStore({
-			url: cxt.env.REDIS_URL!,
-			token: cxt.env.REDIS_TOKEN!,
-		});
-
-		if (!oauth_token || !oauth_verifier) {
-			return getErrorPageResponse(
-				"Missing required authorization parameters. Please try the authorization process again."
-			);
+		if (!oauthReqInfo.clientId) {
+			return ctx.text("Invalid state", 400);
 		}
 
-		const user = await redis.getRequestToken(oauth_token);
+		const code = ctx.req.query("code");
 
-		const userId = user?.id;
-
-
-		if (!userId) {
-			return getErrorPageResponse(
-				"Invalid or expired authorization session. Please try the authorization process again."
-			);
+		if (!code) {
+			return ctx.text("Invalid state", 400);
 		}
 
-		// Retrieve stored tokens
-		const storedTokens = await redis.getUser(userId);
-		if (
-			!storedTokens ||
-			!storedTokens.requestToken ||
-			!storedTokens.requestTokenSecret
-		) {
-			return getErrorPageResponse(
-				"Invalid or expired authorization session. Please try the authorization process again."
-			);
-		}
-
-		// Initialize SplitwiseAuthService with consumer key and secret
 		const splitwiseAuth = new SplitwiseAuthService(
-			cxt.env.SPLITWISE_CONSUMER_KEY!,
-			cxt.env.SPLITWISE_CONSUMER_SECRET!,
-			cxt.env.SPLITWISE_CALLBACK_URL!
+			ctx.env.SPLITWISE_CONSUMER_KEY!,
+			ctx.env.SPLITWISE_CONSUMER_SECRET!,
+			ctx.env.SPLITWISE_CALLBACK_URL!
 		);
 
-		// Exchange request token for access token
-		const accessTokens = await splitwiseAuth.getAccessToken(
-			storedTokens.requestToken,
-			storedTokens.requestTokenSecret,
-			oauth_verifier
-		);
+		const { access_token } = await splitwiseAuth.getAccessToken(code);
 
-		if (!accessTokens.accessToken || !accessTokens.accessTokenSecret) {
+		if (!access_token) {
 			return getErrorPageResponse(
-				"Failed to obtain access token. Please try the authorization process again."
+				"Failed to obtain access token from Splitwise. Please try the authorization process again."
 			);
 		}
 
-		// Store access tokens in the user map and remove request tokens
-		await redis.updateUser(userId, {
-			access_token: accessTokens.accessToken,
-			accessTokenSecret: accessTokens.accessTokenSecret,
+		const userData = await splitwiseAuth.getCurrentUser(access_token);
+		const { first_name, email, last_name, id } = userData;
+
+		
+		const { redirectTo } = await ctx.env.OAUTH_PROVIDER.completeAuthorization({
+			metadata: {
+				label: `${first_name} ${last_name}`,
+			},
+			props: {
+				user: {
+					id: id.toString(),
+					name: `${first_name} ${last_name}`,
+					email: email,
+					accessToken: access_token,
+				},
+			} as Props,
+			request: oauthReqInfo,
+			scope: oauthReqInfo.scope,
 		});
+		
+		if (!redirectTo) {
+			return getErrorPageResponse(
+				"Failed to obtain access token from Splitwise. Please try the authorization process again."
+			);
+		}
+		
+		// UPDATE: Redis is not used currently
+		// const redis = new RedisGlobalStore({
+		// 	url: ctx.env.REDIS_URL!,
+		// 	token: ctx.env.REDIS_TOKEN!,
+		// });
+		// const user = await redis.getUser(id.toString());
 
-		// Remove request tokens from user record
-		await redis.removeUserFields(userId, [
-			"requestToken",
-			"requestTokenSecret",
-		]);
+		// if (!user) {
+		// 	redis.setUser(id.toString(), {
+		// 		id: id.toString(),
+		// 		access_token: access_token,
+		// 	});
+		// }
 
-		// Return the success page
-		return getSuccessPageResponse();
+		// // Store access tokens in the user map and remove request tokens
+		// await redis.updateUser(id.toString(), {
+		// 	access_token: access_token,
+		// });
+
+		// // Remove request tokens from user record
+		// await redis.removeUserFields(id.toString(), [
+		// 	"requestToken",
+		// 	"requestTokenSecret",
+		// ]);
+
+		return ctx.redirect(redirectTo, 302);
 	} catch (error) {
 		console.error("Error in callback:", error);
 		return getErrorPageResponse(
@@ -146,30 +201,4 @@ app.get("/callback", async (cxt: Context) => {
 	}
 });
 
-app.get("/token/:id", async (ctx: Context) => {
-	const userId = ctx.req.param("id");
-
-	const redis = new RedisGlobalStore({
-		url: ctx.env.REDIS_URL!,
-		token: ctx.env.REDIS_TOKEN!,
-	});
-
-	const user = await redis.getUser(userId);
-
-	if (!user) {
-		return ctx.json({
-			sucess: false,
-			message: "user not found",
-		});
-	}
-
-	return ctx.json({
-		sucess: true,
-		message: "users fetched sucessully!",
-		data: {
-			user: user,
-		},
-	});
-});
-
-export default app;
+export { app as SplitwiseAuthHandler };

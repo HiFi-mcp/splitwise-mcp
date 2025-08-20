@@ -1,8 +1,6 @@
 export interface SplitwiseTokens {
-	requestToken?: string;
-	requestTokenSecret?: string;
-	accessToken?: string;
-	accessTokenSecret?: string;
+	access_token: string;
+	token_type: string;
 }
 
 export interface SplitwiseUser {

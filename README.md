@@ -1,7 +1,7 @@
 # Splitwise MCP Server 🪙🤝
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)]()
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-F38020?style=flat&logo=cloudflare&logoColor=white)]()
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-F38020?style=flat&logo=cloudflare&logoColor=white)](https://splitwise-mcp.hifi.click)
 
 A lightweight Model Context Protocol (MCP) server that provides Splitwise integrations and tools for managing users, groups, friends, expenses and notifications. This project is built for Cloudflare Workers using Durable Objects and exposes OAuth endpoints to authorize Splitwise access.
 

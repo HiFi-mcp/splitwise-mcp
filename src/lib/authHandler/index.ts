@@ -1,10 +1,7 @@
 import { Context, Hono } from "hono";
 import { SplitwiseAuthService } from "../splitwise";
 import { Env, Props } from "../../types";
-import { RedisGlobalStore } from "../users";
-import {
-	getErrorPageResponse,
-} from "../static/templates";
+import { getErrorPageResponse } from "../static/templates";
 import {
 	clientIdAlreadyApproved,
 	parseRedirectApproval,
@@ -45,7 +42,6 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
  */
 app.get("/authorize", async (ctx: Context) => {
 	try {
-
 		const oauthReqInfo = await ctx.env.OAUTH_PROVIDER.parseAuthRequest(
 			ctx.req.raw
 		);
@@ -144,7 +140,6 @@ app.get("/callback", async (ctx: Context) => {
 		const userData = await splitwiseAuth.getCurrentUser(access_token);
 		const { first_name, email, last_name, id } = userData;
 
-		
 		const { redirectTo } = await ctx.env.OAUTH_PROVIDER.completeAuthorization({
 			metadata: {
 				label: `${first_name} ${last_name}`,
@@ -160,37 +155,12 @@ app.get("/callback", async (ctx: Context) => {
 			request: oauthReqInfo,
 			scope: oauthReqInfo.scope,
 		});
-		
+
 		if (!redirectTo) {
 			return getErrorPageResponse(
 				"Failed to obtain access token from Splitwise. Please try the authorization process again."
 			);
 		}
-		
-		// UPDATE: Redis is not used currently
-		// const redis = new RedisGlobalStore({
-		// 	url: ctx.env.REDIS_URL!,
-		// 	token: ctx.env.REDIS_TOKEN!,
-		// });
-		// const user = await redis.getUser(id.toString());
-
-		// if (!user) {
-		// 	redis.setUser(id.toString(), {
-		// 		id: id.toString(),
-		// 		access_token: access_token,
-		// 	});
-		// }
-
-		// // Store access tokens in the user map and remove request tokens
-		// await redis.updateUser(id.toString(), {
-		// 	access_token: access_token,
-		// });
-
-		// // Remove request tokens from user record
-		// await redis.removeUserFields(id.toString(), [
-		// 	"requestToken",
-		// 	"requestTokenSecret",
-		// ]);
 
 		return ctx.redirect(redirectTo, 302);
 	} catch (error) {

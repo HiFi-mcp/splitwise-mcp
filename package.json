@@ -14,7 +14,6 @@
 	"dependencies": {
 		"@cloudflare/workers-oauth-provider": "^0.0.6",
 		"@modelcontextprotocol/sdk": "1.17.1",
-		"@upstash/redis": "^1.35.3",
 		"agents": "^0.0.109",
 		"axios": "^1.11.0",
 		"crypto-js": "^4.2.0",

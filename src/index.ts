@@ -2,11 +2,9 @@ import { z } from "zod";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
-import { Env, IUsers, Props } from "./types";
-import { RedisGlobalStore } from "./lib/users";
+import { Env, Props } from "./types";
 import { SplitwiseAuthService } from "./lib/splitwise";
 import { SplitwiseAuthHandler } from "./lib/authHandler";
-
 
 // Use Durable Object state to persist user ID across requests
 let __SERVER_USER_ID: string | undefined;
@@ -29,40 +27,11 @@ export class MyMCP extends McpAgent<Env, Props> {
 	server!: McpServer;
 	protected env: Env;
 	private durableState: DurableObjectState;
-	private globalStore!: RedisGlobalStore;
-
-	// not using currently this does not need
-	users = {
-		set: (key: string, user: IUsers) => this.globalStore.setUser(key, user),
-		get: (key: string) => this.globalStore.getUser(key),
-		has: (key: string) => this.globalStore.hasUser(key),
-		delete: (key: string) => this.globalStore.deleteUser(key),
-		clear: () => this.globalStore.clearUsers(),
-		size: () => this.globalStore.getUsersSize(),
-		entries: async () => {
-			const map = await this.globalStore.getAllUsers();
-			return map.entries();
-		},
-		keys: async () => {
-			const map = await this.globalStore.getAllUsers();
-			return Array.from(map.keys());
-		},
-		values: async () => {
-			const map = await this.globalStore.getAllUsers();
-			return Array.from(map.values());
-		},
-	};
 
 	constructor(state: DurableObjectState, env: Env) {
 		super(state, env);
 		this.env = env;
 		this.durableState = state;
-
-		// Initialize globalStore after env is set
-		this.globalStore = new RedisGlobalStore({
-			url: this.env.REDIS_URL!,
-			token: this.env.REDIS_TOKEN!,
-		});
 	}
 	// Compute from current env set in fetch
 	get backendUrl() {
